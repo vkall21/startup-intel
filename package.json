@@ -1,0 +1,39 @@
+{
+  "name": "startup-intel",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "validate": "ts-node src/validate.ts",
+    "build": "tsc",
+    "ingest:techcrunch": "ts-node src/ingestion/techcrunch.runner.ts",
+    "ingest:producthunt": "ts-node src/ingestion/producthunt.runner.ts",
+    "ingest": "ts-node src/ingestion/runner.ts all",
+    "ingest:tc": "ts-node src/ingestion/runner.ts techcrunch",
+    "ingest:ph": "ts-node src/ingestion/runner.ts producthunt",
+    "detect:dupes": "ts-node src/normalization/detect-duplicates.ts",
+    "merge:dupes:dry": "ts-node src/normalization/merge-duplicates.ts",
+    "merge:dupes": "ts-node src/normalization/merge-duplicates.ts --confirm",
+    "validate:phase3": "ts-node src/normalization/validate-phase3.ts",
+    "enrich:stages": "ts-node src/enrichment/classify-stages.ts",
+    "enrich:hotness": "ts-node src/enrichment/score-hotness.ts",
+    "validate:phase4": "ts-node src/enrichment/validate-phase4.ts",
+    "web": "cd web && npm run dev"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.104.1",
+    "@types/cheerio": "^0.22.35",
+    "@types/node": "^25.6.0",
+    "axios": "^1.15.2",
+    "cheerio": "^1.2.0",
+    "dotenv": "^17.4.2",
+    "playwright": "^1.59.1",
+    "tldts": "^7.0.28",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  }
+}
