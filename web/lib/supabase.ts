@@ -24,4 +24,11 @@ export type Company = {
   source:             string;
   source_url:         string | null;
   created_at:         string;
+  yc_batch:           string | null;
+  yc_status:          string | null;
+  yc_top:             boolean | null;
+  short_desc:         string | null;
+  is_hiring:          boolean | null;
+  careers_url:        string | null;
+  careers_checked_at: string | null;
 };

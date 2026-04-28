@@ -110,16 +110,28 @@ export default function CompanyCard({ company }: { company: Company }) {
       {/* Footer */}
       <div className="flex items-center justify-between pt-1 border-t border-gray-50">
         <span className="text-xs text-gray-300 capitalize">{company.source}</span>
-        {company.source_url && (
-          <a
-            href={company.source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-gray-400 hover:text-blue-500 transition-colors"
-          >
-            Source →
-          </a>
-        )}
+        <div className="flex items-center gap-3">
+          {company.careers_url && (
+            <a
+              href={company.careers_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-emerald-600 hover:text-emerald-700 transition-colors font-medium"
+            >
+              Careers →
+            </a>
+          )}
+          {company.source_url && (
+            <a
+              href={company.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-gray-400 hover:text-blue-500 transition-colors"
+            >
+              Source →
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );
