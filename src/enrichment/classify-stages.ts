@@ -33,13 +33,21 @@ function classifyFromFundingType(fundingType: string | null): FundingStage {
 async function classifyStages(): Promise<void> {
   console.log("\n=== Stage Classification (Rule-based) ===\n");
 
-  const { data: companies, error } = await db
-    .from("companies")
-    .select("website_domain, company_name, stage, funding_total_usd, last_funding_type, source")
-    .eq("needs_enrichment", true);
-
-  if (error) throw new Error(`Fetch failed: ${error.message}`);
-  if (!companies || companies.length === 0) {
+  // Paginate — Supabase caps a default select() at 1000 rows.
+  const PAGE = 1000;
+  const companies: any[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db
+      .from("companies")
+      .select("website_domain, company_name, stage, funding_total_usd, last_funding_type, source")
+      .eq("needs_enrichment", true)
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`Fetch failed: ${error.message}`);
+    if (!data || data.length === 0) break;
+    companies.push(...data);
+    if (data.length < PAGE) break;
+  }
+  if (companies.length === 0) {
     console.log("No companies need enrichment.");
     return;
   }
@@ -102,12 +110,19 @@ async function classifyStages(): Promise<void> {
   console.log(`  Still unknown:             ${stillUnknown}`);
   console.log(`  (Unknown rows flagged for LLM enrichment in next step)`);
 
-  // Final distribution
-  const { data: dist } = await db
-    .from("companies")
-    .select("stage");
-
-  if (dist) {
+  // Final distribution — paginate too so the count reflects the whole table.
+  const dist: { stage: string }[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db
+      .from("companies")
+      .select("stage")
+      .range(from, from + PAGE - 1);
+    if (error) break;
+    if (!data || data.length === 0) break;
+    dist.push(...data);
+    if (data.length < PAGE) break;
+  }
+  if (dist.length > 0) {
     const counts = new Map<string, number>();
     for (const row of dist) counts.set(row.stage, (counts.get(row.stage) || 0) + 1);
     console.log("\n  Updated stage distribution:");

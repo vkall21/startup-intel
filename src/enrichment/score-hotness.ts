@@ -11,6 +11,7 @@ interface CompanyRow {
   press_mentions_30d: number;
   hotness_score:     number;
   source:            string;
+  is_hiring:         boolean | null;
 }
 
 function recencyScore(lastFundingDate: string | null): number {
@@ -28,14 +29,17 @@ function mentionsScore(mentions: number): number {
   return Math.min(Math.log10(mentions + 1) / Math.log10(11), 1.0);
 }
 
-function hiringScore(): number {
-  // Placeholder — Phase 5 will populate headcount data
-  return 0;
+function hiringScore(company: CompanyRow): number {
+  // Binary v1: companies that explicitly mark themselves as hiring get full
+  // hiring weight; non-hiring or unknown get 0. Currently only YC populates
+  // is_hiring; other sources score 0 here. Tighten later with headcount delta
+  // or job-board scraping for finer granularity across all sources.
+  return company.is_hiring === true ? 1.0 : 0.0;
 }
 
 function computeHotness(company: CompanyRow): number {
   const recency  = recencyScore(company.last_funding_date);
-  const hiring   = hiringScore();
+  const hiring   = hiringScore(company);
 
   // For Product Hunt rows, use existing hotness_score as mentions proxy
   const mentionsRaw = company.source === "producthunt"
@@ -49,12 +53,22 @@ function computeHotness(company: CompanyRow): number {
 async function scoreHotness(): Promise<void> {
   console.log("\n=== Hotness Scoring ===\n");
 
-  const { data: companies, error } = await db
-    .from("companies")
-    .select("website_domain, company_name, last_funding_date, press_mentions_30d, hotness_score, source");
+  // Supabase caps a default select() at 1000 rows. Paginate explicitly so we
+  // don't silently drop the tail once the table grows past that.
+  const PAGE = 1000;
+  const companies: CompanyRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db
+      .from("companies")
+      .select("website_domain, company_name, last_funding_date, press_mentions_30d, hotness_score, source, is_hiring")
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`Fetch failed: ${error.message}`);
+    if (!data || data.length === 0) break;
+    companies.push(...(data as CompanyRow[]));
+    if (data.length < PAGE) break;
+  }
 
-  if (error) throw new Error(`Fetch failed: ${error.message}`);
-  if (!companies || companies.length === 0) {
+  if (companies.length === 0) {
     console.log("No companies found.");
     return;
   }

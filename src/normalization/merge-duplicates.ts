@@ -12,6 +12,7 @@ interface DuplicateCandidate {
   company_name_b:   string;
   match_reason:     string;
   similarity_score: number;
+  pending_payload?: Company;
 }
 
 // Merge loser fields into winner — winner fields always take precedence
@@ -76,19 +77,42 @@ async function mergeDuplicates(dryRun: boolean = false): Promise<void> {
   let skipped = 0;
 
   for (const candidate of candidates as DuplicateCandidate[]) {
-    // Fetch both companies
-    const { data: rows, error: fetchError } = await db
-      .from("companies")
-      .select("*")
-      .in("website_domain", [candidate.domain_a, candidate.domain_b]);
+    let rowA: Company;
+    let rowB: Company;
 
-    if (fetchError || !rows || rows.length < 2) {
-      console.log(`  ✗ Skipped pair (${candidate.domain_a} / ${candidate.domain_b}) — one or both not found`);
-      skipped++;
-      continue;
+    if (candidate.match_reason === "cross_source") {
+      // Companies has the winner from ingest time; the loser is in pending_payload.
+      if (!candidate.pending_payload) {
+        console.log(`  ✗ Skipped cross_source pair — pending_payload missing`);
+        skipped++;
+        continue;
+      }
+      const { data: rows, error: fetchError } = await db
+        .from("companies")
+        .select("*")
+        .eq("website_domain", candidate.domain_a)
+        .limit(1);
+      if (fetchError || !rows || rows.length === 0) {
+        console.log(`  ✗ Skipped cross_source pair (${candidate.domain_a}) — winner row not found`);
+        skipped++;
+        continue;
+      }
+      rowA = rows[0] as Company;
+      rowB = candidate.pending_payload as Company;
+    } else {
+      // Legacy path: both rows live in companies (similar_name, same_domain_variant)
+      const { data: rows, error: fetchError } = await db
+        .from("companies")
+        .select("*")
+        .in("website_domain", [candidate.domain_a, candidate.domain_b]);
+      if (fetchError || !rows || rows.length < 2) {
+        console.log(`  ✗ Skipped pair (${candidate.domain_a} / ${candidate.domain_b}) — one or both not found`);
+        skipped++;
+        continue;
+      }
+      rowA = rows[0] as Company;
+      rowB = rows[1] as Company;
     }
-
-    const [rowA, rowB] = rows as Company[];
 
     // Determine winner by source_priority (lower = more trusted)
     const winner = rowA.source_priority <= rowB.source_priority ? rowA : rowB;
@@ -131,16 +155,19 @@ async function mergeDuplicates(dryRun: boolean = false): Promise<void> {
       continue;
     }
 
-    // Delete the loser from main table
-    const { error: deleteError } = await db
-      .from("companies")
-      .delete()
-      .eq("website_domain", loser.website_domain);
+    if (candidate.match_reason !== "cross_source") {
+      // Legacy path: loser is a real row in companies — delete it.
+      // For cross_source, the loser was never inserted, so nothing to delete.
+      const { error: deleteError } = await db
+        .from("companies")
+        .delete()
+        .eq("website_domain", loser.website_domain);
 
-    if (deleteError) {
-      console.error(`    ✗ Delete failed: ${deleteError.message}`);
-      skipped++;
-      continue;
+      if (deleteError) {
+        console.error(`    ✗ Delete failed: ${deleteError.message}`);
+        skipped++;
+        continue;
+      }
     }
 
     // Mark candidate as resolved

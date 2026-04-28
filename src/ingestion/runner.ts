@@ -4,8 +4,10 @@ dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
 import { runTechCrunchIngestion } from "./techcrunch";
 import { runProductHuntIngestion } from "./producthunt";
+import { runWellfoundIngestion } from "./wellfound";
+import { runYcIngestion } from "./yc";
 
-type Source = "techcrunch" | "producthunt" | "all";
+type Source = "techcrunch" | "producthunt" | "wellfound" | "yc" | "all";
 
 async function runIngestion(source: Source): Promise<void> {
   console.log(`\n=== Ingestion Runner — ${source} ===`);
@@ -20,6 +22,12 @@ async function runIngestion(source: Source): Promise<void> {
     if (source === "producthunt" || source === "all") {
       await runProductHuntIngestion();
     }
+    if (source === "wellfound" || source === "all") {
+      await runWellfoundIngestion();
+    }
+    if (source === "yc" || source === "all") {
+      await runYcIngestion();
+    }
   } catch (err) {
     console.error("Ingestion failed:", err);
     process.exit(1);
@@ -30,8 +38,8 @@ async function runIngestion(source: Source): Promise<void> {
 }
 
 const arg = (process.argv[2] || "all") as Source;
-if (!["techcrunch", "producthunt", "all"].includes(arg)) {
-  console.error("Usage: ts-node src/ingestion/runner.ts [techcrunch|producthunt|all]");
+if (!["techcrunch", "producthunt", "wellfound", "yc", "all"].includes(arg)) {
+  console.error("Usage: ts-node src/ingestion/runner.ts [techcrunch|producthunt|wellfound|yc|all]");
   process.exit(1);
 }
 

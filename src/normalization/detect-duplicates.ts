@@ -57,14 +57,22 @@ function isDomainVariant(a: string, b: string): boolean {
 async function detectDuplicates(): Promise<void> {
   console.log("\n=== Duplicate Detection ===\n");
 
-  // Fetch all companies
-  const { data: companies, error } = await db
-    .from("companies")
-    .select("website_domain, company_name, source_priority, source")
-    .order("source_priority", { ascending: true });
-
-  if (error) throw new Error(`Failed to fetch companies: ${error.message}`);
-  if (!companies || companies.length === 0) {
+  // Paginate — Supabase caps a default select() at 1000 rows. With YC + others
+  // the table is well over that, and a partial scan would silently miss dupes.
+  const PAGE = 1000;
+  const companies: any[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db
+      .from("companies")
+      .select("website_domain, company_name, source_priority, source")
+      .order("source_priority", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`Failed to fetch companies: ${error.message}`);
+    if (!data || data.length === 0) break;
+    companies.push(...data);
+    if (data.length < PAGE) break;
+  }
+  if (companies.length === 0) {
     console.log("No companies found. Run ingestion first.");
     return;
   }
@@ -79,8 +87,10 @@ async function detectDuplicates(): Promise<void> {
       const a = companies[i] as Company;
       const b = companies[j] as Company;
 
-      // Skip same source comparisons — only care about cross-source dupes
-      if (a.source === b.source) continue;
+      // Cross-source dupes are now handled at ingest time via duplicate_candidates
+      // with match_reason='cross_source'. This script focuses on near-name and
+      // domain-variant matches across the whole dataset (both same-source and
+      // cross-source remnants that ingestion didn't catch).
 
       const pairKey = [a.website_domain, b.website_domain].sort().join("||");
       if (seen.has(pairKey)) continue;

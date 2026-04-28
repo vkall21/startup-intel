@@ -29,12 +29,20 @@ async function validatePhase3(): Promise<void> {
     query: `SELECT website_domain, count(*) as n FROM companies GROUP BY website_domain HAVING count(*) > 1`
   }).select();
 
-  // Use direct query instead
-  const { data: allCompanies } = await db
-    .from("companies")
-    .select("website_domain, company_name, source_priority, stage, funding_total_usd, source");
-
-  if (!allCompanies) { fail("Could not fetch companies"); return; }
+  // Paginate — Supabase caps a default select() at 1000 rows.
+  const PAGE = 1000;
+  const allCompanies: any[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db
+      .from("companies")
+      .select("website_domain, company_name, source_priority, stage, funding_total_usd, source")
+      .range(from, from + PAGE - 1);
+    if (error) { fail("Could not fetch companies", error.message); return; }
+    if (!data || data.length === 0) break;
+    allCompanies.push(...data);
+    if (data.length < PAGE) break;
+  }
+  if (allCompanies.length === 0) { fail("Could not fetch companies"); return; }
 
   // Check for duplicate domains
   const domainCounts = new Map<string, number>();

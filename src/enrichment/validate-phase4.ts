@@ -18,11 +18,20 @@ async function validatePhase4(): Promise<void> {
     console.warn(`  ⚠ ${label}${detail ? ": " + detail : ""}`); warnings++;
   }
 
-  const { data: companies } = await db
-    .from("companies")
-    .select("website_domain, company_name, stage, hotness_score, funding_total_usd, source, needs_enrichment");
-
-  if (!companies) { fail("Could not fetch companies"); return; }
+  // Paginate — Supabase caps a default select() at 1000 rows.
+  const PAGE = 1000;
+  const companies: any[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await db
+      .from("companies")
+      .select("website_domain, company_name, stage, hotness_score, funding_total_usd, source, needs_enrichment")
+      .range(from, from + PAGE - 1);
+    if (error) { fail("Could not fetch companies", error.message); return; }
+    if (!data || data.length === 0) break;
+    companies.push(...data);
+    if (data.length < PAGE) break;
+  }
+  if (companies.length === 0) { fail("Could not fetch companies"); return; }
 
   // 1. No null hotness scores
   const nullScores = companies.filter(c => c.hotness_score === null || c.hotness_score === undefined);
