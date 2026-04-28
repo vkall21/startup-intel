@@ -1,5 +1,26 @@
 node_modules/
 dist/
+.next/
 .env.local
 .env
 *.env
+
+# TypeScript stray build artifacts under web source dirs
+# (Next.js / Turbopack uses .next/ — anything else is from an accidental tsc run)
+web/app/**/*.js
+web/app/**/*.js.map
+web/app/**/*.d.ts
+web/app/**/*.d.ts.map
+web/components/**/*.js
+web/components/**/*.js.map
+web/components/**/*.d.ts
+web/components/**/*.d.ts.map
+web/lib/**/*.js
+web/lib/**/*.js.map
+web/lib/**/*.d.ts
+web/lib/**/*.d.ts.map
+web/next.config.js
+web/next.config.js.map
+web/next.config.d.ts
+web/next.config.d.ts.map
+web/tsconfig.tsbuildinfo
