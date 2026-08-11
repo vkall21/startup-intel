@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       source:
-        description: 'Source to ingest (techcrunch, producthunt, wellfound, all)'
+        description: 'Source to ingest (techcrunch, producthunt, wellfound, yc, all)'
         required: false
         default: 'all'
 
@@ -16,9 +16,9 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'npm'
@@ -33,6 +33,7 @@ jobs:
         env:
           SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          PRODUCT_HUNT_TOKEN:   ${{ secrets.PRODUCT_HUNT_TOKEN }}
         run: npm run ingest -- ${{ github.event.inputs.source || 'all' }}
 
       - name: Run enrichment

@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
 import * as path from "path";
+import { describeDbError } from "./errors";
 
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
@@ -14,7 +15,10 @@ if (!key || key === "your_service_role_key_here") {
   throw new Error("SUPABASE_SERVICE_KEY is not set in .env.local");
 }
 
-export const db: SupabaseClient = createClient(url, key);
+// Re-bind post-guard so the narrowed type survives into the functions below.
+const supabaseUrl: string = url;
+
+export const db: SupabaseClient = createClient(supabaseUrl, key);
 
 export type Company = {
   website_domain:      string;
@@ -53,7 +57,9 @@ export async function upsertCompany(company: Company): Promise<void> {
     });
 
   if (error) {
-    throw new Error(`Upsert failed for ${company.website_domain}: ${error.message}`);
+    throw new Error(
+      `Upsert failed for ${company.website_domain}: ${describeDbError(error, supabaseUrl)}`
+    );
   }
 }
 
@@ -69,7 +75,7 @@ export async function upsertCompanies(companies: Company[]): Promise<void> {
     .in("website_domain", domains);
 
   if (fetchError) {
-    throw new Error(`Pre-fetch failed: ${fetchError.message}`);
+    throw new Error(`Pre-fetch failed: ${describeDbError(fetchError, supabaseUrl)}`);
   }
 
   const existingByDomain = new Map<string, Company>(
@@ -137,7 +143,7 @@ export async function upsertCompanies(companies: Company[]): Promise<void> {
       .from("duplicate_candidates")
       .insert(candidates);
     if (candErr) {
-      throw new Error(`Candidate insert failed: ${candErr.message}`);
+      throw new Error(`Candidate insert failed: ${describeDbError(candErr, supabaseUrl)}`);
     }
   }
 
@@ -150,7 +156,7 @@ export async function upsertCompanies(companies: Company[]): Promise<void> {
         ignoreDuplicates: false,
       });
     if (upsertErr) {
-      throw new Error(`Batch upsert failed: ${upsertErr.message}`);
+      throw new Error(`Batch upsert failed: ${describeDbError(upsertErr, supabaseUrl)}`);
     }
   }
 }

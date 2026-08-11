@@ -5,6 +5,9 @@ dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 import { db, upsertCompany } from "./lib/db";
 import { normalizeDomain, normalizeCompanyName, normalizeInvestors } from "./lib/normalize";
 import { classifyStage } from "./config";
+import { describeError, describeDbError } from "./lib/errors";
+
+const SUPABASE_URL = process.env.SUPABASE_URL ?? "";
 
 async function runValidation() {
   console.log("\n=== Phase 1 Validation ===\n");
@@ -58,8 +61,7 @@ async function runValidation() {
     console.log("  ✓ companies table exists");
     passed += 2;
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error(`  ✗ Supabase connection failed: ${msg}`);
+    console.error(`  ✗ Supabase connection failed: ${describeDbError(e, SUPABASE_URL)}`);
     failed += 2;
   }
 
@@ -83,19 +85,24 @@ async function runValidation() {
     console.log("  ✓ Upsert succeeded");
     passed++;
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error(`  ✗ Upsert failed: ${msg}`);
+    // upsertCompany already annotates DB-reachability failures — don't re-wrap.
+    console.error(`  ✗ Upsert failed: ${describeError(e)}`);
     failed++;
   }
 
   // --- Cleanup test row ---
+  // supabase-js reports failures in the returned `error`, not by throwing —
+  // checking only for a thrown exception passed this even against a dead host.
   try {
-    await db.from("companies").delete().eq("website_domain", "test-validate-phase1.com");
+    const { error } = await db
+      .from("companies")
+      .delete()
+      .eq("website_domain", "test-validate-phase1.com");
+    if (error) throw error;
     console.log("  ✓ Cleanup succeeded");
     passed++;
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error(`  ✗ Cleanup failed: ${msg}`);
+    console.error(`  ✗ Cleanup failed: ${describeDbError(e, SUPABASE_URL)}`);
     failed++;
   }
 
@@ -103,15 +110,21 @@ async function runValidation() {
   console.log("\npg_trgm extension:");
   try {
     const { error } = await db.rpc("similarity", { arg1: "openai", arg2: "open ai" }).single();
-    if (error && error.message.includes("function similarity")) {
+    if (!error) {
+      console.log("  ✓ pg_trgm enabled");
+      passed++;
+    } else if (error.message.includes("function similarity")) {
       console.error("  ✗ pg_trgm not enabled — run: CREATE EXTENSION IF NOT EXISTS pg_trgm;");
       failed++;
     } else {
-      console.log("  ✓ pg_trgm enabled");
-      passed++;
+      // Any other error (transport failure, auth, RLS) is NOT evidence that
+      // pg_trgm is installed — don't report a pass we haven't actually proven.
+      console.error(`  ✗ pg_trgm check inconclusive: ${describeError(error)}`);
+      failed++;
     }
-  } catch {
-    console.log("  ~ pg_trgm check skipped (rpc method unavailable — verify manually)");
+  } catch (e: unknown) {
+    console.error(`  ✗ pg_trgm check inconclusive: ${describeError(e)}`);
+    failed++;
   }
 
   // --- Summary ---

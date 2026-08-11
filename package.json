@@ -8,7 +8,7 @@
     "build": "tsc",
     "ingest:techcrunch": "ts-node src/ingestion/techcrunch.runner.ts",
     "ingest:producthunt": "ts-node src/ingestion/producthunt.runner.ts",
-    "ingest": "ts-node src/ingestion/runner.ts all",
+    "ingest": "ts-node src/ingestion/runner.ts",
     "ingest:tc": "ts-node src/ingestion/runner.ts techcrunch",
     "ingest:ph": "ts-node src/ingestion/runner.ts producthunt",
     "ingest:wellfound": "ts-node src/ingestion/wellfound.runner.ts",
