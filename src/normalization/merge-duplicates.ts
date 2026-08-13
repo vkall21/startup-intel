@@ -180,10 +180,14 @@ async function mergeDuplicates(dryRun: boolean = false): Promise<void> {
     merged++;
   }
 
-  console.log("=== Merge Complete ===");
-  console.log(`  Merged:  ${merged}`);
+  // Dry run counts intent, not writes — labelling both the same made a dry run
+  // read as though it had merged and archived 148 rows.
+  console.log(`=== ${dryRun ? "Dry Run Complete (nothing written)" : "Merge Complete"} ===`);
+  console.log(`  ${dryRun ? "Would merge:" : "Merged: "} ${merged}`);
   console.log(`  Skipped: ${skipped}`);
-  console.log(`  Archived rows visible in: companies_archive table`);
+  if (!dryRun) {
+    console.log(`  Archived rows visible in: companies_archive table`);
+  }
 }
 
 // Run dry run first, then real merge

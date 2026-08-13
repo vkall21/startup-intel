@@ -65,7 +65,12 @@ async function detectDuplicates(): Promise<void> {
     const { data, error } = await db
       .from("companies")
       .select("website_domain, company_name, source_priority, source")
+      // source_priority alone is not a total order — ties break arbitrarily per
+      // query, so paged windows overlapped and skipped rows. That pulled some
+      // rows twice (surfacing as bogus "exact_domain" self-pairs, impossible on
+      // a PK column) while never fetching others. Tiebreak on the PK.
       .order("source_priority", { ascending: true })
+      .order("website_domain", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw new Error(`Failed to fetch companies: ${error.message}`);
     if (!data || data.length === 0) break;

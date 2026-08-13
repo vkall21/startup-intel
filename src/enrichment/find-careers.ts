@@ -65,6 +65,8 @@ async function fetchCandidates(flags: CliFlags): Promise<CompanyRow[]> {
     let query = db
       .from("companies")
       .select("website_domain, company_name, source, careers_checked_at")
+      // Stable total order — without it, paged windows overlap and miss rows.
+      .order("website_domain", { ascending: true })
       .range(from, from + PAGE - 1);
 
     if (flags.source) query = query.eq("source", flags.source);

@@ -41,6 +41,8 @@ async function classifyStages(): Promise<void> {
       .from("companies")
       .select("website_domain, company_name, stage, funding_total_usd, last_funding_type, source")
       .eq("needs_enrichment", true)
+      // Stable total order — without it, paged windows overlap and miss rows.
+      .order("website_domain", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw new Error(`Fetch failed: ${error.message}`);
     if (!data || data.length === 0) break;
@@ -116,6 +118,9 @@ async function classifyStages(): Promise<void> {
     const { data, error } = await db
       .from("companies")
       .select("stage")
+      // Stable total order — without it, paged windows overlap and miss rows,
+      // skewing the distribution counts.
+      .order("website_domain", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) break;
     if (!data || data.length === 0) break;

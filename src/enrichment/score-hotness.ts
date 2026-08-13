@@ -61,6 +61,9 @@ async function scoreHotness(): Promise<void> {
     const { data, error } = await db
       .from("companies")
       .select("website_domain, company_name, last_funding_date, press_mentions_30d, hotness_score, source, is_hiring")
+      // Stable total order — without it, paged windows overlap and miss rows,
+      // so some companies were scored twice and others never scored.
+      .order("website_domain", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw new Error(`Fetch failed: ${error.message}`);
     if (!data || data.length === 0) break;

@@ -25,6 +25,9 @@ async function validatePhase4(): Promise<void> {
     const { data, error } = await db
       .from("companies")
       .select("website_domain, company_name, stage, hotness_score, funding_total_usd, source, needs_enrichment")
+      // Stable total order — without it, paged windows overlap and miss rows,
+      // so the gate was validating a partial dataset.
+      .order("website_domain", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) { fail("Could not fetch companies", error.message); return; }
     if (!data || data.length === 0) break;

@@ -107,25 +107,23 @@ async function runValidation() {
   }
 
   // --- pg_trgm check ---
+  // This probe used to `db.rpc("similarity", { arg1, arg2 })`, which can never
+  // succeed: pg_trgm's similarity(text, text) has unnamed parameters, so
+  // PostgREST cannot bind named args to it, and PostgREST only exposes routines
+  // in the exposed schema anyway. It always returned PGRST202, and the old
+  // string match ("function similarity") missed the actual wording ("function
+  // public.similarity"), so this reported a PASS on every run — including
+  // against a database that did not exist.
+  //
+  // Nothing in the pipeline calls SQL similarity(): detect-duplicates.ts scores
+  // pairs with its own Dice coefficient in TypeScript. So there is nothing here
+  // to gate on. Report the extension as unverified rather than inventing a
+  // verdict in either direction.
   console.log("\npg_trgm extension:");
-  try {
-    const { error } = await db.rpc("similarity", { arg1: "openai", arg2: "open ai" }).single();
-    if (!error) {
-      console.log("  ✓ pg_trgm enabled");
-      passed++;
-    } else if (error.message.includes("function similarity")) {
-      console.error("  ✗ pg_trgm not enabled — run: CREATE EXTENSION IF NOT EXISTS pg_trgm;");
-      failed++;
-    } else {
-      // Any other error (transport failure, auth, RLS) is NOT evidence that
-      // pg_trgm is installed — don't report a pass we haven't actually proven.
-      console.error(`  ✗ pg_trgm check inconclusive: ${describeError(error)}`);
-      failed++;
-    }
-  } catch (e: unknown) {
-    console.error(`  ✗ pg_trgm check inconclusive: ${describeError(e)}`);
-    failed++;
-  }
+  console.log("  ~ not verified — cannot be probed over PostgREST, and the");
+  console.log("    pipeline does not use SQL similarity() (dedup scores in JS).");
+  console.log("    Confirm in the SQL editor if you need it:");
+  console.log("    SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm';");
 
   // --- Summary ---
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

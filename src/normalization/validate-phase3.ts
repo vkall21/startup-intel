@@ -24,10 +24,10 @@ async function validatePhase3(): Promise<void> {
     warnings++;
   }
 
-  // 1. No duplicate domains
-  const { data: domainDupes } = await db.rpc("sql", {
-    query: `SELECT website_domain, count(*) as n FROM companies GROUP BY website_domain HAVING count(*) > 1`
-  }).select();
+  // 1. No duplicate domains — checked in JS below.
+  // (There was an `db.rpc("sql", { query: ... })` call here. Supabase exposes no
+  // generic `sql` RPC, so it always errored; the error was discarded and its
+  // result never read. Removed rather than left looking like a live check.)
 
   // Paginate — Supabase caps a default select() at 1000 rows.
   const PAGE = 1000;
@@ -36,6 +36,8 @@ async function validatePhase3(): Promise<void> {
     const { data, error } = await db
       .from("companies")
       .select("website_domain, company_name, source_priority, stage, funding_total_usd, source")
+      // Stable total order — without it, paged windows overlap and miss rows.
+      .order("website_domain", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) { fail("Could not fetch companies", error.message); return; }
     if (!data || data.length === 0) break;
